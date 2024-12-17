@@ -59,6 +59,9 @@ func main() {
 		WsUpgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
+		AuctionLobby: services.AuctionLobby{
+			Rooms: make(map[uuid.UUID]*services.AuctionRoom),
+		},
 	}
 
 	api.BindRoutes()
