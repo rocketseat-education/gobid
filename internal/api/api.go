@@ -11,6 +11,7 @@ type Api struct {
 	Router         *chi.Mux
 	UserService    services.UserService
 	ProductService services.ProductService
+	BidsService    services.BidsService
 	Sessions       *scs.SessionManager
 	WsUpgrader     websocket.Upgrader
 	AuctionLobby   services.AuctionLobby
