@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -21,6 +22,7 @@ const (
 
 	// Errors
 	FailedToPlaceBid
+	InvalidJSON
 
 	// Info
 	NewBidPlaced
@@ -28,10 +30,10 @@ const (
 )
 
 type Message struct {
-	Message string
-	Amount  float64
-	Kind    MessageKind
-	UserID  uuid.UUID
+	Message string      `json:"message,omitempty"`
+	Amount  float64     `json:"amount,omitempty"`
+	Kind    MessageKind `json:"kind"`
+	UserID  uuid.UUID   `json:"user_id,omitempty"`
 }
 
 type AuctionLobby struct {
@@ -85,6 +87,13 @@ func (r *AuctionRoom) broadcastMessage(m Message) {
 			}
 			client.Send <- newBidMessage
 		}
+	case InvalidJSON:
+		client, ok := r.Clients[m.UserID]
+		if !ok {
+			slog.Info("Client not found in hashmap", "user_id", m.UserID)
+			return
+		}
+		client.Send <- m
 	}
 }
 
@@ -139,5 +148,43 @@ func NewClient(room *AuctionRoom, conn *websocket.Conn, userId uuid.UUID) *Clien
 		Conn:   conn,
 		Send:   make(chan Message, 512),
 		UserId: userId,
+	}
+}
+
+const (
+	maxMessageSize = 512
+	readDeadline   = 60 * time.Second
+)
+
+func (c *Client) ReadEventLoop() {
+	defer func() {
+		c.Room.Unregister <- c
+		c.Conn.Close()
+	}()
+
+	c.Conn.SetReadLimit(maxMessageSize)
+	c.Conn.SetReadDeadline(time.Now().Add(readDeadline))
+	c.Conn.SetPongHandler(func(string) error {
+		c.Conn.SetReadDeadline(time.Now().Add(readDeadline))
+		return nil
+	})
+
+	for {
+		var m Message
+		m.UserID = c.UserId
+		err := c.Conn.ReadJSON(&m)
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				slog.Error("Unexpected Close error", "error", err)
+				return
+			}
+
+			c.Room.Broadcast <- Message{
+				Kind:    InvalidJSON,
+				Message: "this message should be a valid json",
+				UserID:  m.UserID,
+			}
+		}
+		c.Room.Broadcast <- m
 	}
 }

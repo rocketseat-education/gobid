@@ -65,9 +65,6 @@ func (api *Api) handleSubscribeUserToAuction(w http.ResponseWriter, r *http.Requ
 	client := services.NewClient(room, conn, userId)
 
 	room.Resgister <- client
-	// go client.ReadEventLoop()
+	go client.ReadEventLoop()
 	// go client.WriteEventLoop()
-	for {
-
-	}
 }
