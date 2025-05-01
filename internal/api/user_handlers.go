@@ -33,7 +33,7 @@ func (api *Api) handleSignupUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = jsonutils.EncodeJson(w, r, http.StatusUnprocessableEntity, map[string]any{
+	_ = jsonutils.EncodeJson(w, r, http.StatusOK, map[string]any{
 		"user_id": id,
 	})
 }
