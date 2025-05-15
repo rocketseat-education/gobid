@@ -41,3 +41,25 @@ push: tag
 	aws ecr get-login-password --region $(REGION) | \
 	docker login --username AWS --password-stdin $(ECL_URL)
 	docker push $(REPO_URL):latest
+
+create-db:
+	@if ! aws rds describe-db-instances --db-instance-identifier ${DB_NAME} --region ${REGION} >/dev/null 2>&1; then \
+		echo "Creating RDS instance ${DB_NAME}..."; \
+		SG_ID=$$(aws ec2 describe-security-groups --filters Name=group-name,Values=${SG_NAME} --region ${REGION} --query 'SecurityGroups[0].GroupId' --output text); \
+		aws rds create-db-instance \
+			--db-instance-identifier ${DB_NAME} \
+			--db-instance-class db.t3.micro \
+			--engine postgres \
+			--allocated-storage 20 \
+			--master-username postgres \
+			--master-user-password 123456 \
+			--vpc-security-group-ids $$SG_ID \
+			--publicly-accessible \
+			--backup-retention-period 0 \
+			--no-multi-az \
+			--engine-version 11.22 \
+			--port 5432 \
+			--region ${REGION}; \
+	else \
+		echo "RDS instance ${DB_NAME} already exists."; \
+	fi
