@@ -31,3 +31,40 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code || (echo "go.mod ou go.sum estão desatualizados"; exit 1)
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint, tidy]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.23
+
+      - name: Rodar testes
+        run: go test ./...
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.23
+
+      - name: Gerar cobertura
+        run: |
+          go test -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out
+          go tool cover -func=coverage.out | grep total | awk '{ print $3 }' > coverage.txt
+
+      - name: Validar cobertude mínima
+        run: |
+          COV=$(cat coverage.txt | sed 's/%//')
+          MIN=0
+          echo "Cobertura atual: $COV%"
+          if [ "$COV" -lt "$MIN" ]; then
+            echo "Cobertura abaixo do mínimo ($MIN%)"
+            exit 1
+          fi
